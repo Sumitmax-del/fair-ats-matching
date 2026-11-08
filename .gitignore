@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Model weights (large binary files — do not commit)
+backend/weights/*.pt
+backend/weights/*.pkl

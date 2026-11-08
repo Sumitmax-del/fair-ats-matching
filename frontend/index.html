@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FairMatch ATS — Inclusive Resume & Job Matching (UN SDG 10)</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Lottie Web & Confetti CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <style>
+    /* ─── CSS Variables & Theme Setup ─────────────────────────────────── */
+    :root {
+      --bg-dark: #07090e;
+      --bg-base: #0b0f19;
+      --bg-surface: rgba(17, 24, 39, 0.75);
+      --bg-surface-hover: rgba(30, 41, 59, 0.85);
+      --border-subtle: rgba(51, 65, 85, 0.6);
+      --border-glow: rgba(99, 102, 241, 0.4);
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --cyan: #06b6d4;
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.35);
+      --rose: #f43f5e;
+      --rose-glow: rgba(244, 63, 94, 0.35);
+      --amber: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --radius-xl: 20px;
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+      --transition-smooth: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      line-height: 1.6;
+    }
+
+    /* ─── Canvas Particle Background ──────────────────────────────────── */
+    #particleCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Floating Ambient Glowing Blobs */
+    .ambient-glow {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.22;
+      animation: floatOrb 22s infinite alternate ease-in-out;
+    }
+    .glow-cyan {
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, #06b6d4, transparent 70%);
+      top: -150px;
+      left: -100px;
+    }
+    .glow-indigo {
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, #6366f1, transparent 70%);
+      bottom: -150px;
+      right: -100px;
+      animation-duration: 28s;
+    }
+    .glow-rose {
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, #e11d48, transparent 70%);
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation-duration: 32s;
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(60px, 40px) scale(1.08); }
+      100% { transform: translate(-40px, 70px) scale(0.95); }
+    }
+
+    /* ─── Layout Wrapper ──────────────────────────────────────────────── */
+    .app-container {
+      position: relative;
+      z-index: 1;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 2.2rem 1.5rem 5rem;
+    }
+
+    /* ─── Glassmorphism Utility ───────────────────────────────────────── */
+    .glass-card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+      transition: var(--transition-smooth);
+    }
+    .glass-card:hover {
+      border-color: rgba(99, 102, 241, 0.35);
+      box-shadow: 0 14px 40px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    }
+
+    /* ─── Header Section ──────────────────────────────────────────────── */
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      position: relative;
+    }
+
+    .top-meta-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.4rem 1.1rem;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(225, 29, 72, 0.4);
+      border-radius: 100px;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 0 20px -5px rgba(225, 29, 72, 0.25);
+    }
+    .sdg-tag {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #e11d48, #be123c);
+      color: #fff;
+      padding: 0.2rem 0.65rem;
+      border-radius: 100px;
+    }
+    .sdg-target {
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      font-weight: 500;
+    }
+
+    .app-title {
+      font-size: 2.75rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 70%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.6rem;
+    }
+    .app-title span {
+      background: linear-gradient(135deg, #6366f1, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .app-subtitle {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 680px;
+      margin: 0 auto 1.4rem;
+      font-weight: 400;
+    }
+
+    /* Tech pills row */
+    .feature-pills {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.6rem;
+      margin-top: 0.8rem;
+    }
+    .tech-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(71, 85, 105, 0.4);
+      color: #cbd5e1;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.3rem 0.85rem;
+      border-radius: 100px;
+    }
+    .tech-pill svg {
+      width: 14px;
+      height: 14px;
+      color: var(--cyan);
+    }
+
+    /* Server Status Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+      margin-top: 1rem;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      transition: var(--transition-smooth);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber);
+      animation: pulseDot 2s infinite;
+    }
+    .status-badge.online .status-dot {
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+    }
+    .status-badge.offline .status-dot {
+      background: var(--rose);
+      box-shadow: 0 0 8px var(--rose);
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* ─── Demo Presets Bar ────────────────────────────────────────────── */
+    .demo-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding: 0.85rem 1.25rem;
+      margin-bottom: 1.5rem;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+    }
+    .demo-bar-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .demo-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .btn-preset {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--border-subtle);
+      color: #cbd5e1;
+      padding: 0.35rem 0.8rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .btn-preset:hover {
+      background: rgba(99, 102, 241, 0.25);
+      border-color: var(--primary-light);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .btn-clear {
+      background: transparent;
+      border: 1px dashed var(--border-subtle);
+      color: var(--text-dim);
+    }
+    .btn-clear:hover {
+      border-color: var(--rose);
+      color: var(--rose);
+      background: rgba(244, 63, 94, 0.1);
+    }
+
+    /* ─── Input Grid ──────────────────────────────────────────────────── */
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 860px) {
+      .input-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .editor-card {
+      padding: 1.4rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.85rem;
+    }
+    .editor-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      letter-spacing: -0.2px;
+    }
+    .editor-title svg {
+      width: 18px;
+      height: 18px;
+      color: var(--cyan);
+    }
+    .editor-meta {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .textarea-wrapper {
+      position: relative;
+      flex: 1;
+    }
+    textarea {
+      width: 100%;
+      height: 250px;
+      background: rgba(10, 14, 23, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      resize: vertical;
+      transition: var(--transition-smooth);
+      outline: none;
+    }
+    textarea:focus {
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 0 20px -5px rgba(6, 182, 212, 0.25);
+      background: rgba(10, 14, 23, 0.95);
+    }
+    textarea::placeholder {
+      color: #475569;
+    }
+
+    /* ─── Action Button Section ───────────────────────────────────────── */
+    .cta-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 1rem 0 2.5rem;
+      position: relative;
+    }
+
+    .match-btn {
+      position: relative;
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #06b6d4 100%);
+      color: #ffffff;
+      border: none;
+      padding: 1.05rem 3.4rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      border-radius: 100px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      letter-spacing: 0.3px;
+      box-shadow: 0 10px 30px -8px rgba(99, 102, 241, 0.6), 0 0 15px rgba(6, 182, 212, 0.3);
+      transition: var(--transition-smooth);
+      overflow: hidden;
+    }
+    .match-btn::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, transparent 60%);
+      transform: scale(0);
+      transition: transform 0.6s ease-out;
+      pointer-events: none;
+    }
+    .match-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 15px 40px -8px rgba(99, 102, 241, 0.8), 0 0 25px rgba(6, 182, 212, 0.5);
+    }
+    .match-btn:hover::before {
+      transform: scale(1);
+    }
+    .match-btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+    .match-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    /* ─── Neural Scanning / Loading State ─────────────────────────────── */
+    .scan-status-container {
+      display: none;
+      margin-top: 1.25rem;
+      text-align: center;
+      animation: fadeIn 0.3s ease forwards;
+    }
+    .scan-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 1.4rem;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border-glow);
+      border-radius: 100px;
+      box-shadow: 0 0 25px rgba(99, 102, 241, 0.3);
+    }
+    .pulse-ring {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--cyan);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .scan-ticker {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      letter-spacing: 0.2px;
+    }
+
+    /* ─── Results Dashboard ───────────────────────────────────────────── */
+    #resultsSection {
+      display: none;
+      opacity: 0;
+      transform: translateY(24px);
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #resultsSection.visible {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .results-hero-card {
+      padding: 2.2rem;
+      text-align: center;
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Circular Progress Gauge */
+    .gauge-wrapper {
+      position: relative;
+      width: 190px;
+      height: 190px;
+      margin: 0 auto 1.5rem;
+    }
+    .gauge-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .gauge-bg {
+      fill: none;
+      stroke: rgba(51, 65, 85, 0.4);
+      stroke-width: 12;
+    }
+    .gauge-bar {
+      fill: none;
+      stroke-width: 12;
+      stroke-linecap: round;
+      stroke-dasharray: 502.65;
+      stroke-dashoffset: 502.65;
+      transition: stroke-dashoffset 1.4s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.6s ease;
+      filter: drop-shadow(0 0 10px currentColor);
+    }
+    .gauge-content {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .gauge-pct {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      color: #ffffff;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .gauge-sub {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .verdict-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 0.55rem 1.6rem;
+      border-radius: 100px;
+      letter-spacing: 0.4px;
+      margin-bottom: 0.85rem;
+      transition: var(--transition-smooth);
+    }
+    .verdict-match {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--emerald);
+      color: #34d399;
+      box-shadow: 0 0 25px var(--emerald-glow);
+    }
+    .verdict-nomatch,
+    .verdict-below {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid var(--rose);
+      color: #fb7185;
+      box-shadow: 0 0 25px var(--rose-glow);
+    }
+
+    .verdict-explanation {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* ─── De-Identification Audit Cards ───────────────────────────────── */
+    .audit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 860px) {
+      .audit-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .audit-card {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .audit-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .audit-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .audit-title svg {
+      width: 17px;
+      height: 17px;
+      color: #f43f5e;
+    }
+    .btn-copy {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-size: 0.74rem;
+      font-weight: 600;
+      padding: 0.3rem 0.65rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: var(--transition-smooth);
+    }
+    .btn-copy:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--primary-light);
+      color: #fff;
+    }
+
+    /* Redacted Proxies Tags */
+    .redaction-tags-container {
+      margin-bottom: 1rem;
+      min-height: 38px;
+    }
+    .redaction-tags-title {
+      font-size: 0.73rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-dim);
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .tags-flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .proxy-tag {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0.25rem 0.65rem;
+      border-radius: 100px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      animation: tagPop 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .proxy-tag.none {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #6ee7b7;
+    }
+
+    @keyframes tagPop {
+      0% { opacity: 0; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* Sanitized Code Box */
+    .sanitized-preview {
+      background: rgba(10, 14, 23, 0.9);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.95rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.6;
+    }
+    /* Highlight redacted tags in preview */
+    .sanitized-preview .highlight-tag {
+      background: rgba(244, 63, 94, 0.25);
+      color: #fda4af;
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      font-weight: 600;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    /* ─── Error Notification Box ──────────────────────────────────────── */
+    .error-box {
+      display: none;
+      padding: 1.1rem 1.4rem;
+      margin-top: 1.5rem;
+      border-radius: var(--radius-lg);
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+      font-size: 0.88rem;
+      text-align: center;
+      animation: fadeIn 0.3s ease;
+    }
+    .error-box strong {
+      color: #fff;
+    }
+
+    /* ─── Footer ──────────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border-subtle);
+      color: var(--text-dim);
+      font-size: 0.82rem;
+    }
+    footer p {
+      margin-bottom: 0.4rem;
+    }
+    footer a {
+      color: var(--primary-light);
+      text-decoration: none;
+    }
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Particle Canvas & Ambient Glows -->
+  <canvas id="particleCanvas"></canvas>
+  <div class="ambient-glow glow-cyan"></div>
+  <div class="ambient-glow glow-indigo"></div>
+  <div class="ambient-glow glow-rose"></div>
+
+  <!-- Main Application Container -->
+  <div class="app-container">
+
+    <!-- Header -->
+    <header>
+      <div class="top-meta-bar">
+        <span class="sdg-tag">UN SDG 10</span>
+        <span class="sdg-target">Target 10.2 & 10.3: Reduced Inequalities in Hiring</span>
+      </div>
+
+      <h1 class="app-title">FairMatch <span>ATS</span></h1>
+      <p class="app-subtitle">
+        Deep semantic matching between anonymized resumes and job requirements while actively mitigating demographic and pedigree bias.
+      </p>
+
+      <div class="feature-pills">
+        <span class="tech-pill">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+          Zero-PII Persistence
+        </span>
+        <span class="tech-pill">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+          spaCy NER & Pedigree Neutralization
+        </span>
+        <span class="tech-pill">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          Siamese Bi-LSTM Dual-Tower (CPU)
+        </span>
+      </div>
+
+      <!-- Live Server Health Badge -->
+      <div>
+        <div id="serverBadge" class="status-badge">
+          <span class="status-dot"></span>
+          <span id="serverStatusText">Verifying Backend Connection...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Quick Sample Presets Toolbar -->
+    <div class="demo-bar glass-card">
+      <div class="demo-bar-label">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        Quick Load Demo Profiles:
+      </div>
+      <div class="demo-actions">
+        <button class="btn-preset" onclick="loadPreset('strong')">
+          ⚡ Demo 1: Strong Match (Inclusive ML Engineer)
+        </button>
+        <button class="btn-preset" onclick="loadPreset('pedigree')">
+          🎓 Demo 2: Pedigree Bias Audit (Non-Elite College)
+        </button>
+        <button class="btn-preset" onclick="loadPreset('mismatch')">
+          ❌ Demo 3: Cross-Domain Non-Match
+        </button>
+        <button class="btn-preset btn-clear" onclick="clearInputs()">
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <!-- Dual Text Input Grid -->
+    <div class="input-grid">
+      <!-- Resume Card -->
+      <div class="editor-card glass-card">
+        <div class="editor-header">
+          <div class="editor-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            Candidate Resume
+          </div>
+          <div class="editor-meta" id="resumeCharCount">0 characters</div>
+        </div>
+        <div class="textarea-wrapper">
+          <textarea id="resumeInput" placeholder="Paste candidate's resume here...&#10;&#10;Personal contact details (name, email, phone, locations, university names) will be scrubbed into neutral vector tokens before computing similarity." oninput="updateCounts()"></textarea>
+        </div>
+      </div>
+
+      <!-- Job Description Card -->
+      <div class="editor-card glass-card">
+        <div class="editor-header">
+          <div class="editor-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            Job Description (JD)
+          </div>
+          <div class="editor-meta" id="jdCharCount">0 characters</div>
+        </div>
+        <div class="textarea-wrapper">
+          <textarea id="jdInput" placeholder="Paste the job description & role requirements here...&#10;&#10;The Bi-Encoder extracts semantic skill requirements without pedigree bias." oninput="updateCounts()"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Match CTA Button & Live Neural Scanning State -->
+    <div class="cta-container">
+      <button id="matchBtn" class="match-btn" onclick="executeMatch()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span>Evaluate Fair Match</span>
+      </button>
+
+      <!-- Neural Scanning Status Indicator -->
+      <div id="scanStatus" class="scan-status-container">
+        <div class="scan-pill">
+          <div class="pulse-ring"></div>
+          <div id="scanTickerText" class="scan-ticker">De-identifying PII & Neutralizing Pedigree...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Box -->
+    <div id="errorBox" class="error-box"></div>
+
+    <!-- Results Section (Animated Reveal) -->
+    <div id="resultsSection">
+      
+      <!-- Primary Compatibility Verdict Card -->
+      <div class="results-hero-card glass-card">
+        
+        <!-- Animated Circular Gauge -->
+        <div class="gauge-wrapper">
+          <svg class="gauge-svg" viewBox="0 0 180 180">
+            <circle class="gauge-bg" cx="90" cy="90" r="80"></circle>
+            <circle id="gaugeArc" class="gauge-bar" cx="90" cy="90" r="80"></circle>
+          </svg>
+          <div class="gauge-content">
+            <div id="gaugeScore" class="gauge-pct">0%</div>
+            <div class="gauge-sub">Fair Metric</div>
+          </div>
+        </div>
+
+        <!-- Verdict Badge -->
+        <div id="verdictBadge" class="verdict-badge verdict-match">
+          <span id="verdictIcon">✓</span>
+          <span id="verdictText">MATCH QUALIFIED</span>
+        </div>
+
+        <p id="verdictExplanation" class="verdict-explanation">
+          Semantic similarity between anonymized skill profiles exceeds the fair cutoff boundary.
+        </p>
+      </div>
+
+      <!-- De-Identification & Anonymized Diffing Audit Grid -->
+      <div class="audit-grid">
+        
+        <!-- Resume Audit Card -->
+        <div class="audit-card glass-card">
+          <div class="audit-header">
+            <div class="audit-title">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+              Candidate De-Identification Audit
+            </div>
+            <button class="btn-copy" onclick="copyText('anonymizedResume')">
+              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+              <span id="copyResumeText">Copy</span>
+            </button>
+          </div>
+
+          <div class="redaction-tags-container">
+            <div class="redaction-tags-title">Redacted Demographic & Pedigree Proxies:</div>
+            <div id="resumeTagsFlow" class="tags-flow"></div>
+          </div>
+
+          <div class="redaction-tags-title">Anonymized Candidate Embedding Tokens:</div>
+          <div id="anonymizedResume" class="sanitized-preview"></div>
+        </div>
+
+        <!-- JD Audit Card -->
+        <div class="audit-card glass-card">
+          <div class="audit-header">
+            <div class="audit-title">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+              Job Requirement Normalization Audit
+            </div>
+            <button class="btn-copy" onclick="copyText('anonymizedJd')">
+              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+              <span id="copyJdText">Copy</span>
+            </button>
+          </div>
+
+          <div class="redaction-tags-container">
+            <div class="redaction-tags-title">Redacted Bias Signals in JD:</div>
+            <div id="jdTagsFlow" class="tags-flow"></div>
+          </div>
+
+          <div class="redaction-tags-title">Anonymized Requirement Embedding Tokens:</div>
+          <div id="anonymizedJd" class="sanitized-preview"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>FairMatch ATS</strong> · B.Tech CSE Deep Learning Academic Project</p>
+      <p>Aligned with <strong>UN Sustainable Development Goal 10 (Target 10.2 & 10.3)</strong>: Eradicating systemic bias in automated hiring pipelines.</p>
+    </footer>
+
+  </div>
+
+  <!-- ─── Interactive Client-Side JavaScript ────────────────────────────── -->
+  <script>
+    const API_ENDPOINT = "http://127.0.0.1:8000/api/match";
+    const HEALTH_ENDPOINT = "http://127.0.0.1:8000/";
+
+    // ── 1. Interactive Particle Mesh Canvas ───────────────────────────
+    const canvas = document.getElementById("particleCanvas");
+    const ctx = canvas.getContext("2d");
+    let particles = [];
+    const PARTICLE_COUNT = 45;
+    let mouse = { x: null, y: null, radius: 120 };
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    window.addEventListener("mousemove", (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+    });
+    window.addEventListener("mouseout", () => {
+      mouse.x = null;
+      mouse.y = null;
+    });
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 1;
+        this.vx = (Math.random() - 0.5) * 0.45;
+        this.vy = (Math.random() - 0.5) * 0.45;
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+
+        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+
+        // Gentle mouse interaction
+        if (mouse.x !== null) {
+          let dx = mouse.x - this.x;
+          let dy = mouse.y - this.y;
+          let distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < mouse.radius) {
+            let angle = Math.atan2(dy, dx);
+            this.x -= Math.cos(angle) * 0.7;
+            this.y -= Math.sin(angle) * 0.7;
+          }
+        }
+      }
+      draw() {
+        ctx.fillStyle = "rgba(148, 163, 184, 0.35)";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      particles.push(new Particle());
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].update();
+        particles[i].draw();
+
+        for (let j = i + 1; j < particles.length; j++) {
+          let dx = particles[i].x - particles[j].x;
+          let dy = particles[i].y - particles[j].y;
+          let dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 130) {
+            ctx.strokeStyle = `rgba(99, 102, 241, ${0.18 * (1 - dist / 130)})`;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    // ── 2. Live Backend Health Checker ────────────────────────────────
+    async function checkBackendHealth() {
+      const badge = document.getElementById("serverBadge");
+      const text = document.getElementById("serverStatusText");
+
+      try {
+        const res = await fetch(HEALTH_ENDPOINT, { method: "GET" });
+        if (res.ok) {
+          const data = await res.json();
+          badge.className = "status-badge online";
+          text.textContent = data.model_loaded 
+            ? "🟢 Backend Online · PyTorch CPU Bi-Encoder Loaded" 
+            : "🟡 Backend Online · Weights Pending in backend/weights/";
+        } else {
+          throw new Error();
+        }
+      } catch (err) {
+        badge.className = "status-badge offline";
+        text.textContent = "🔴 Backend Offline (Run uvicorn backend.main:app on :8000)";
+      }
+    }
+    checkBackendHealth();
+    setInterval(checkBackendHealth, 10000);
+
+    // ── 3. Character Counters ─────────────────────────────────────────
+    function updateCounts() {
+      const resumeLen = document.getElementById("resumeInput").value.length;
+      const jdLen = document.getElementById("jdInput").value.length;
+      document.getElementById("resumeCharCount").textContent = `${resumeLen.toLocaleString()} characters`;
+      document.getElementById("jdCharCount").textContent = `${jdLen.toLocaleString()} characters`;
+    }
+
+    // ── 4. Demo Data Presets ──────────────────────────────────────────
+    const DEMO_PRESETS = {
+      strong: {
+        resume: `Priya Sharma
+Email: priya.sharma99@gmail.com | Phone: +91 98765 43210
+Location: Mumbai, Maharashtra, India | LinkedIn: https://linkedin.com/in/priya-sharma-ai
+
+EDUCATION
+Bachelor of Technology in Computer Science & Engineering
+Indian Institute of Technology Bombay, 2020 - 2024
+Relevant Coursework: Deep Learning, Natural Language Processing, Data Structures.
+
+TECHNICAL SKILLS
+Python, PyTorch, FastAPI, Docker, Transformers, NLP, spaCy, Git, CI/CD, SQL, Linux
+
+EXPERIENCE
+Machine Learning Engineer Intern at DeepPulse Technologies
+- Architected and trained Siamese Bi-Encoder networks using PyTorch for semantic text matching.
+- Built low-latency CPU inference pipelines with FastAPI and Docker containers.
+- Implemented bias mitigation audits reducing gender and prestige disparity metrics.`,
+        jd: `AI / Deep Learning Engineer
+Looking for an experienced Deep Learning Engineer to develop semantic text retrieval pipelines.
+
+Key Qualifications:
+- Strong proficiency in Python and PyTorch.
+- Experience training neural networks (LSTMs, Bi-Encoders, Transformers) for NLP applications.
+- Hands-on experience developing RESTful APIs with FastAPI and Docker.
+- Demonstrated passion for ethical AI, algorithmic fairness, and inclusive hiring practices.`
+      },
+
+      pedigree: {
+        resume: `Carlos Daniel Rodriguez
+Email: carlos.rodriguez.dev@yahoo.com
+Phone: +1 (555) 349-8210
+Location: San Antonio, Texas, United States
+
+EDUCATION
+Bachelor of Science in Information Technology
+State Community College of Technology, 2019 - 2023
+
+TECHNICAL SKILLS
+Python, PyTorch, LSTM, FastAPI, Scikit-Learn, Docker, Microservices, REST APIs, Git, PostgreSQL
+
+EXPERIENCE
+Junior Software Developer at CloudWave Systems
+- Developed backend microservices using FastAPI and Docker.
+- Optimized PyTorch model inference latencies by 40% on standard CPU architectures.
+- Built automated text sanitization pipelines to scrub customer PII.`,
+        jd: `Senior Machine Learning Developer
+Seeking a talented software engineer with strong deep learning capabilities.
+
+Responsibilities:
+- Build and optimize PyTorch models (Bi-Encoders, LSTMs) for similarity ranking.
+- Deploy CPU-optimized microservices with FastAPI and Docker.
+- Implement robust data pipelines and model inference monitoring.`
+      },
+
+      mismatch: {
+        resume: `Chef Jean-Pierre Laurent
+Email: jp.laurent.chef@gourmetdining.com | Phone: +1 (555) 723-9182
+Location: New Orleans, Louisiana, USA
+
+EDUCATION
+Associate Degree in Culinary Arts & Food Service Management
+Le Cordon Institute of Hospitality, 2014 - 2017
+
+TECHNICAL SKILLS
+Culinary Arts, Menu Planning, Food Preparation, Pastry, Kitchen Operations, Wine Pairing, Knife Skills, Food Costing, HACCP Safety Standards
+
+EXPERIENCE
+Executive Chef at Le Bistro Moderne
+- Supervised culinary kitchen staff of 18 line cooks and kitchen assistants.
+- Designed seasonal French menus, managed food inventory, supplier relations, and plate presentation.
+- Enforced HACCP food safety, temperature logs, sanitation standards, and ingredient quality.`,
+        jd: `Distributed Systems Engineer (Go / Kubernetes / Kafka)
+Seeking a Distributed Systems Engineer to design low-latency, fault-tolerant backend infrastructure.
+
+Key Responsibilities:
+- Implement distributed consensus protocols (Raft, Paxos) and event streaming pipelines.
+- Deploy and manage high-throughput services using Kubernetes, Docker, and Kafka.
+- Architect asynchronous microservices in Go and Rust with sub-millisecond p99 latencies.
+- Monitor distributed tracing, network metrics, and fault-injection chaos testing.`
+      }
+    };
+
+    function loadPreset(type) {
+      if (!DEMO_PRESETS[type]) return;
+      document.getElementById("resumeInput").value = DEMO_PRESETS[type].resume;
+      document.getElementById("jdInput").value = DEMO_PRESETS[type].jd;
+      updateCounts();
+      
+      // Animate inputs slightly
+      document.querySelectorAll("textarea").forEach(t => {
+        t.style.borderColor = "var(--cyan)";
+        setTimeout(() => { t.style.borderColor = ""; }, 400);
+      });
+    }
+
+    function clearInputs() {
+      document.getElementById("resumeInput").value = "";
+      document.getElementById("jdInput").value = "";
+      updateCounts();
+      document.getElementById("resultsSection").classList.remove("visible");
+      document.getElementById("errorBox").style.display = "none";
+    }
+
+    // ── 5. Match Execution & Neural Scanning Simulation ───────────────
+    let scanInterval = null;
+    const SCAN_MESSAGES = [
+      "Normalizing whitespace & text structure...",
+      "Redacting personal contact details (Email & Phone)...",
+      "De-identifying Named Entities (spaCy PERSON & LOCATION)...",
+      "Neutralizing elite institutional pedigree tags (SDG 10)...",
+      "Tokenizing through shared vocabulary (max_len=128)...",
+      "Forwarding through PyTorch Siamese Bi-Encoder...",
+      "Projecting vectors into metric space & computing Cosine Sim..."
+    ];
+
+    async function executeMatch() {
+      const resume = document.getElementById("resumeInput").value.trim();
+      const jd = document.getElementById("jdInput").value.trim();
+      const btn = document.getElementById("matchBtn");
+      const scanStatus = document.getElementById("scanStatus");
+      const tickerText = document.getElementById("scanTickerText");
+      const errorBox = document.getElementById("errorBox");
+      const resultsSection = document.getElementById("resultsSection");
+
+      errorBox.style.display = "none";
+      errorBox.textContent = "";
+
+      if (!resume || !jd) {
+        showError("Please provide both a candidate resume and a job description before evaluating.");
+        return;
+      }
+
+      // Enter Loading State
+      btn.disabled = true;
+      btn.querySelector("span").textContent = "Evaluating Match...";
+      scanStatus.style.display = "block";
+      resultsSection.classList.remove("visible");
+
+      let msgIndex = 0;
+      tickerText.textContent = SCAN_MESSAGES[0];
+      scanInterval = setInterval(() => {
+        msgIndex = (msgIndex + 1) % SCAN_MESSAGES.length;
+        tickerText.textContent = SCAN_MESSAGES[msgIndex];
+      }, 450);
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/match", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resume_text: resume, job_description: jd }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server returned error status ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("[DEBUG FRONTEND RECEIVED]", data);
+        
+        // Small delay so user perceives the neural evaluation sequence
+        setTimeout(() => {
+          clearInterval(scanInterval);
+          scanStatus.style.display = "none";
+          btn.disabled = false;
+          btn.querySelector("span").textContent = "Evaluate Fair Match";
+          renderResults(data);
+        }, 600);
+
+      } catch (err) {
+        clearInterval(scanInterval);
+        scanStatus.style.display = "none";
+        btn.disabled = false;
+        btn.querySelector("span").textContent = "Evaluate Fair Match";
+        showError(`Inference Failed: ${err.message}. Ensure backend is running via 'uvicorn backend.main:app --port 8000'.`);
+      }
+    }
+
+    function showError(msg) {
+      const errorBox = document.getElementById("errorBox");
+      errorBox.innerHTML = `⚠️ <strong>Notice:</strong> ${msg}`;
+      errorBox.style.display = "block";
+    }
+
+    // ── 6. Results Rendering & Dynamic Gauge Animation ────────────────
+    function renderResults(data) {
+      console.log("[DEBUG FRONTEND RECEIVED]", data);
+      const resultsSection = document.getElementById("resultsSection");
+      resultsSection.classList.add("visible");
+
+      // Stop calculating, inverting, or transforming any math in JavaScript:
+      const scoreVal = data.compatibility_score ?? data.score ?? 0;
+      const isMatch = Boolean(data.is_match);
+
+      // Set text on your actual percentage element directly:
+      const scoreEl = document.querySelector('.score-display, .gauge-value, #scoreVal, #gaugeScore, .gauge-pct, [class*="score"]');
+      if (scoreEl) {
+        scoreEl.textContent = `${scoreVal}%`;
+      }
+
+      // Ensure the verdict element updates cleanly:
+      const verdictBadge = document.querySelector('.verdict-badge, #verdictBadge, [class*="verdict"]');
+      if (verdictBadge) {
+        verdictBadge.textContent = isMatch ? "MATCH QUALIFIED" : "BELOW THRESHOLD";
+        verdictBadge.className = isMatch ? "verdict-badge verdict-match" : "verdict-badge verdict-below";
+      }
+
+      // Animate SVG Gauge Arc directly from scoreVal
+      const arc = document.getElementById("gaugeArc");
+      if (arc) {
+        const circumference = 2 * Math.PI * 80; // ~502.65
+        const offset = circumference - (circumference * (scoreVal / 100));
+        arc.style.strokeDasharray = `${circumference}`;
+        arc.style.stroke = isMatch ? "#10b981" : "#f43f5e";
+        setTimeout(() => {
+          arc.style.strokeDashoffset = `${offset}`;
+        }, 50);
+      }
+
+      // Diagnostic Subtitle & Detailed Explanation
+      const rawDist = data.distance !== undefined ? data.distance : data.raw_distance;
+      const distStr = rawDist !== undefined ? Number(rawDist).toFixed(4) : "—";
+      const sharedWordsCount = data.shared_keywords_count !== undefined ? data.shared_keywords_count : 0;
+      const thresholdVal = data.threshold !== undefined ? Number(data.threshold).toFixed(2) : "0.55";
+
+      const subEl = document.querySelector(".gauge-sub");
+      if (subEl) {
+        subEl.textContent = `Distance: ${distStr} · Shared: ${sharedWordsCount}`;
+      }
+
+      const explanation = document.getElementById("verdictExplanation");
+      if (explanation) {
+        if (isMatch) {
+          explanation.textContent = `Candidate qualifies for the role with ${scoreVal}% compatibility (Euclidean distance: ${distStr}, cutoff threshold: ≤ ${thresholdVal}).`;
+          triggerConfetti();
+        } else {
+          explanation.textContent = `Candidate Euclidean distance is ${distStr}, exceeding the ≤ ${thresholdVal} qualification cutoff (${scoreVal}% compatibility).`;
+        }
+      }
+
+      // Render Redacted Tags
+      renderTags("resumeTagsFlow", data.redacted_resume_proxies || []);
+      renderTags("jdTagsFlow", data.redacted_jd_proxies || []);
+
+      // Render Sanitized Previews with highlighted tags
+      renderHighlightedText("anonymizedResume", data.anonymized_resume);
+      renderHighlightedText("anonymizedJd", data.anonymized_jd);
+
+      // Smooth scroll to results
+      resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function animateScoreCounter(targetScore) {
+      const scoreEl = document.getElementById("gaugeScore");
+      const duration = 1200; // ms
+      const startTime = performance.now();
+
+      function update(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease-out cubic
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const currentVal = (targetScore * easeOut).toFixed(1);
+        scoreEl.textContent = `${currentVal}%`;
+
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        } else {
+          scoreEl.textContent = `${targetScore.toFixed(1)}%`;
+        }
+      }
+      requestAnimationFrame(update);
+    }
+
+    function renderTags(containerId, tags) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+
+      if (!tags || tags.length === 0) {
+        container.innerHTML = `<span class="proxy-tag none">✓ No demographic proxies found</span>`;
+        return;
+      }
+
+      tags.forEach((tag, idx) => {
+        const span = document.createElement("span");
+        span.className = "proxy-tag";
+        span.style.animationDelay = `${idx * 0.08}s`;
+        span.textContent = `🛡️ ${tag}`;
+        container.appendChild(span);
+      });
+    }
+
+    function renderHighlightedText(elementId, text) {
+      const el = document.getElementById(elementId);
+      if (!text) {
+        el.textContent = "(Empty)";
+        return;
+      }
+
+      // Highlight known placeholder tokens
+      const escaped = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/(\[(?:EMAIL|PHONE|CANDIDATE_NAME|LOCATION|INSTITUTE|TITLE|PORTFOLIO_LINK)\])/g, '<span class="highlight-tag">$1</span>');
+
+      el.innerHTML = escaped;
+    }
+
+    function triggerConfetti() {
+      if (typeof confetti === "function") {
+        confetti({
+          particleCount: 70,
+          spread: 60,
+          origin: { y: 0.65 },
+          colors: ['#6366f1', '#06b6d4', '#10b981', '#f59e0b']
+        });
+      }
+    }
+
+    function copyText(elementId) {
+      const el = document.getElementById(elementId);
+      const btnTextId = elementId === "anonymizedResume" ? "copyResumeText" : "copyJdText";
+      const btnLabel = document.getElementById(btnTextId);
+
+      navigator.clipboard.writeText(el.innerText || el.textContent).then(() => {
+        const old = btnLabel.textContent;
+        btnLabel.textContent = "Copied!";
+        setTimeout(() => { btnLabel.textContent = old; }, 1800);
+      });
+    }
+
+    // Initialize counts on load
+    updateCounts();
+  </script>
+</body>
+</html>
