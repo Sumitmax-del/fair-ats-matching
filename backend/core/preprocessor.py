@@ -359,19 +359,49 @@ class TextSanitizer:
     def __init__(self, spacy_model: str = "en_core_web_sm") -> None:
         self._anon = Anonymizer(spacy_model=spacy_model)
 
+    def clean_for_model(self, raw_text: str) -> str:
+        """Process text identical to Colab training preprocessing:
+        1. Strip emails, phone numbers, and URLs via regex.
+        2. Filter out PERSON, GPE, and LOC named entities.
+        3. Drop punctuation and whitespace tokens.
+        4. Lowercase and lemmatize tokens (t.lemma_.lower()).
+        """
+        if not raw_text or not raw_text.strip():
+            return ""
+
+        text = str(raw_text)
+        text = re.sub(r'\S+@\S+', ' ', text)
+        text = re.sub(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', ' ', text)
+        text = re.sub(r'http\S+|www\.\S+', ' ', text)
+
+        nlp = self._anon.nlp
+        if nlp is not None:
+            doc = nlp(text)
+            tokens = [
+                t.lemma_.lower() for t in doc
+                if t.ent_type_ not in ["PERSON", "GPE", "LOC"]
+                and not t.is_punct and not t.is_space
+            ]
+            return " ".join(tokens)
+        else:
+            cleaned_words = [re.sub(r'[^\w\s]', '', w.lower()) for w in text.split()]
+            return " ".join(w for w in cleaned_words if w)
+
     def sanitize(self, raw_text: str) -> Dict[str, Any]:
         """Return sanitized text plus a list of redacted proxy types.
 
         Returns
         -------
         dict with keys:
-          - ``clean_text``       : str – de-identified text
+          - ``clean_text``       : str – de-identified text for UI display
+          - ``model_text``       : str – lemmatized, punctuation-free text for model inference
           - ``redacted_proxies`` : list[str] – e.g. ["[EMAIL]", "[CANDIDATE_NAME]", ...]
         """
         if not raw_text or not raw_text.strip():
-            return {"clean_text": "", "redacted_proxies": []}
+            return {"clean_text": "", "model_text": "", "redacted_proxies": []}
 
         clean = self._anon.anonymize(raw_text)
+        model_text = self.clean_for_model(raw_text)
 
         # Catalogue which placeholder types are present
         proxy_tags = [
@@ -380,7 +410,11 @@ class TextSanitizer:
         ]
         found = [tag for tag in proxy_tags if tag in clean]
 
-        return {"clean_text": clean, "redacted_proxies": found}
+        return {
+            "clean_text": clean,
+            "model_text": model_text,
+            "redacted_proxies": found,
+        }
 
 
 if __name__ == "__main__":

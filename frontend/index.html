@@ -1269,53 +1269,51 @@ Key Responsibilities:
       const resultsSection = document.getElementById("resultsSection");
       resultsSection.classList.add("visible");
 
-      // Stop calculating, inverting, or transforming any math in JavaScript:
-      const scoreVal = data.compatibility_score ?? data.score ?? 0;
+      // Unconditionally display data.compatibility_score (no JS math / inversion)
+      const finalScore = Math.round(data.compatibility_score !== undefined ? data.compatibility_score : data.score);
       const isMatch = Boolean(data.is_match);
 
-      // Set text on your actual percentage element directly:
-      const scoreEl = document.querySelector('.score-display, .gauge-value, #scoreVal, #gaugeScore, .gauge-pct, [class*="score"]');
-      if (scoreEl) {
-        scoreEl.textContent = `${scoreVal}%`;
+      // Force score container text:
+      const scoreEl = document.querySelector('.gauge-value, .score-display, #scoreVal, #gaugeScore, [class*="score"]');
+      if (scoreEl) scoreEl.textContent = `${finalScore}%`;
+
+      // Force badge styling:
+      const badge = document.querySelector('.verdict-badge, #verdictBadge, [class*="verdict"]');
+      if (badge) {
+          badge.textContent = isMatch ? "MATCH QUALIFIED" : "BELOW THRESHOLD";
+          badge.className = isMatch ? "verdict-badge verdict-match" : "verdict-badge verdict-below";
       }
 
-      // Ensure the verdict element updates cleanly:
-      const verdictBadge = document.querySelector('.verdict-badge, #verdictBadge, [class*="verdict"]');
-      if (verdictBadge) {
-        verdictBadge.textContent = isMatch ? "MATCH QUALIFIED" : "BELOW THRESHOLD";
-        verdictBadge.className = isMatch ? "verdict-badge verdict-match" : "verdict-badge verdict-below";
-      }
-
-      // Animate SVG Gauge Arc directly from scoreVal
-      const arc = document.getElementById("gaugeArc");
-      if (arc) {
-        const circumference = 2 * Math.PI * 80; // ~502.65
-        const offset = circumference - (circumference * (scoreVal / 100));
-        arc.style.strokeDasharray = `${circumference}`;
-        arc.style.stroke = isMatch ? "#10b981" : "#f43f5e";
-        setTimeout(() => {
-          arc.style.strokeDashoffset = `${offset}`;
-        }, 50);
+      // Force update the circular SVG progress/gauge (if present):
+      const gaugeProgress = document.querySelector('.gauge-progress, #gaugeProgress, #gaugeArc, .gauge-bar');
+      if (gaugeProgress) {
+          const radius = Number(gaugeProgress.getAttribute('r')) || 80;
+          const circumference = 2 * Math.PI * radius;
+          const offset = circumference - (finalScore / 100) * circumference;
+          gaugeProgress.style.strokeDasharray = `${circumference}`;
+          gaugeProgress.style.strokeDashoffset = `${offset}`;
+          gaugeProgress.style.stroke = isMatch ? "#10b981" : "#f43f5e";
       }
 
       // Diagnostic Subtitle & Detailed Explanation
       const rawDist = data.distance !== undefined ? data.distance : data.raw_distance;
       const distStr = rawDist !== undefined ? Number(rawDist).toFixed(4) : "—";
-      const sharedWordsCount = data.shared_keywords_count !== undefined ? data.shared_keywords_count : 0;
-      const thresholdVal = data.threshold !== undefined ? Number(data.threshold).toFixed(2) : "0.55";
+      const cosSimStr = data.cos_sim !== undefined ? Number(data.cos_sim).toFixed(4) : (data.raw_cosine !== undefined ? Number(data.raw_cosine).toFixed(4) : "—");
+      const thresholdVal = data.threshold !== undefined ? Number(data.threshold).toFixed(2) : "0.72";
 
       const subEl = document.querySelector(".gauge-sub");
       if (subEl) {
-        subEl.textContent = `Distance: ${distStr} · Shared: ${sharedWordsCount}`;
+        const overlapStr = data.domain_overlap !== undefined ? ` · Overlap: ${(Number(data.domain_overlap) * 100).toFixed(0)}%` : "";
+        subEl.textContent = `Cos Sim: ${cosSimStr}${overlapStr} · Dist: ${distStr}`;
       }
 
       const explanation = document.getElementById("verdictExplanation");
       if (explanation) {
         if (isMatch) {
-          explanation.textContent = `Candidate qualifies for the role with ${scoreVal}% compatibility (Euclidean distance: ${distStr}, cutoff threshold: ≤ ${thresholdVal}).`;
+          explanation.textContent = `Candidate qualifies for the role with ${finalScore}% compatibility (Cosine similarity: ${cosSimStr}, cutoff threshold: ≥ ${thresholdVal}).`;
           triggerConfetti();
         } else {
-          explanation.textContent = `Candidate Euclidean distance is ${distStr}, exceeding the ≤ ${thresholdVal} qualification cutoff (${scoreVal}% compatibility).`;
+          explanation.textContent = `Candidate similarity is ${cosSimStr} (Euclidean distance: ${distStr}), falling below the ≥ ${thresholdVal} qualification cutoff (${finalScore}% compatibility).`;
         }
       }
 

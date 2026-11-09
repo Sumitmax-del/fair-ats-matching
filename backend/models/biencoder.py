@@ -80,8 +80,8 @@ class SiameseBiEncoder(nn.Module):
         """
         x = self.embedding(token_ids)                # (B, S, embed_dim)
         lstm_out, _ = self.lstm(x)                    # (B, S, hidden_dim*2)
-        # Mean-pool over the sequence dimension
-        pooled = lstm_out.mean(dim=1)                 # (B, hidden_dim*2)
+        # Max-pool over the sequence dimension (matching Colab training)
+        pooled, _ = torch.max(lstm_out, dim=1)        # (B, hidden_dim*2)
         proj = self.fc(pooled)                        # (B, 64)
         normalised = F.normalize(proj, p=2, dim=1)
         return normalised
