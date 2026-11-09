@@ -222,3 +222,22 @@ __marimo__/
 # Model weights (large binary files — do not commit)
 backend/weights/*.pt
 backend/weights/*.pkl
+
+# Ignore all datasets inside backend/weights/
+backend/weights/*.csv
+backend/weights/*.tsv
+backend/weights/*.json
+backend/weights/*.parquet
+backend/weights/*.zip
+backend/weights/*.tar.gz
+
+# Ignore Jupyter notebooks and checkpoints inside backend/weights/
+backend/weights/*.ipynb
+backend/weights/.ipynb_checkpoints/
+
+# Keep the essential model weight files tracked (un-ignore if needed):
+!backend/weights/fair_ats_biencoder.pt
+!backend/weights/vocab.json
+
+backend/weights/*.csv
+backend/weights/*.ipynb
