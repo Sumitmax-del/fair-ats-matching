@@ -65,6 +65,15 @@ def compute_token_overlap(tokens_a: list, tokens_b: list) -> float:
     return intersection / union if union > 0 else 0.0
 
 
+def clean_text_for_model(text: str) -> str:
+    """Normalize text by stripping Unicode bullets, smart quotes, em-dashes, and non-ASCII punctuation."""
+    # Replace special bullets, smart quotes, em-dashes
+    text = re.sub(r'[\u2022\u2023\u25E6\u2043\u2219\u2014\u2013\u201c\u201d\u2018\u2019]', ' ', text)
+    # Keep letters and basic punctuation
+    text = re.sub(r'[^a-zA-Z0-9\s.,;]', ' ', text)
+    return text.lower().strip()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load model weights and metadata once at startup (CPU only)."""
@@ -108,11 +117,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "*",
         "http://localhost:5500",
         "http://127.0.0.1:5500",
         "http://localhost:3000",
-        "http://127.0.0.1:3000",
+        "*",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -129,6 +137,7 @@ class MatchRequest(BaseModel):
     job_description: str | None = Field(None, description="Raw job description text")
     resume: str | None = Field(None, description="Alias for resume_text")
     jd: str | None = Field(None, description="Alias for job_description")
+    jd_text: str | None = Field(None, description="Alias for job_description")
 
 
 class MatchResponse(BaseModel):
@@ -137,7 +146,7 @@ class MatchResponse(BaseModel):
     is_match: bool = Field(..., description="Whether candidate qualifies for the role")
     cos_sim: float | None = Field(None, description="Cosine similarity between normalized embeddings")
     distance: float = Field(..., description="Euclidean pairwise distance between normalized embeddings")
-    threshold: float = Field(0.72, description="Decision threshold used")
+    threshold: float = Field(0.70, description="Decision threshold used")
     anonymized_resume: str = Field("", description="De-identified resume text")
     anonymized_jd: str = Field("", description="De-identified JD text")
 
@@ -194,129 +203,88 @@ async def match(req: MatchRequest):
     try:
         payload = req
         print(f"\n>>> RECEIVED REQUEST AT /api/match <<<")
-        resume_val = payload.resume if hasattr(payload, "resume") and payload.resume else (payload.resume_text or "")
-        jd_val = payload.jd if hasattr(payload, "jd") and payload.jd else (payload.job_description or "")
-        print(f"Resume chars: {len(payload.resume) if hasattr(payload, 'resume') and payload.resume else len(resume_val)}")
+        resume_text = payload.resume_text or payload.resume or ""
+        jd_text = payload.jd_text or payload.job_description or payload.jd or ""
+        print(f"Extracted Resume chars: {len(resume_text)} | JD chars: {len(jd_text)}")
 
-        # --- 1. De-identify -----------------------------------------------
-        res_result = _sanitizer.sanitize(resume_val)
-        jd_result = _sanitizer.sanitize(jd_val)
-
-        clean_resume = res_result["clean_text"]
-        clean_jd = jd_result["clean_text"]
-        model_resume = res_result.get("model_text") or clean_resume
-        model_jd = jd_result.get("model_text") or clean_jd
-
-        if not clean_resume.strip() or not clean_jd.strip():
+        if not resume_text.strip() or not jd_text.strip():
             raise HTTPException(
                 status_code=422,
-                detail="After de-identification, one or both inputs are empty.",
+                detail="Please provide both Resume and Job Description.",
             )
 
-        # --- 2. Tokenise for PyTorch Bi-Encoder ----------------------------
+        # 1. Clean and lowercase inputs
+        clean_r = re.sub(r'[^a-zA-Z0-9\s]', ' ', resume_text).lower()
+        clean_j = re.sub(r'[^a-zA-Z0-9\s]', ' ', jd_text).lower()
+
+        # 2. Calculate Vocabulary Overlap to detect domain mismatch
+        words_r = set(clean_r.split())
+        words_j = set(clean_j.split())
+        common_words = words_r & words_j
+
+        COMMON_FILLERS = {'and', 'the', 'to', 'of', 'in', 'for', 'with', 'a', 'an', 'is', 'as', 'at', 'by', 'on', 'from', 'or', 'team', 'work', 'years', 'experience', 'skills'}
+        meaningful_overlap = common_words - COMMON_FILLERS
+        overlap_ratio = len(meaningful_overlap) / max(len(words_j - COMMON_FILLERS), 1)
+
+        # 3. De-identification & Preprocessing for Model
+        res_result = _sanitizer.sanitize(resume_text)
+        jd_result = _sanitizer.sanitize(jd_text)
+
         vocab = _metadata["vocab"]
-        max_len = _metadata["max_len"]
+        max_len = _metadata.get("max_len", 128)
+
+        model_resume = res_result.get("model_text") or clean_r
+        model_jd = jd_result.get("model_text") or clean_j
 
         tensor_r = text_to_sequence(model_resume, vocab, max_len)
         tensor_j = text_to_sequence(model_jd, vocab, max_len)
 
-        print(f"[TOKEN AUDIT] Resume non-zero: {(tensor_r != 0).sum().item()} | JD non-zero: {(tensor_j != 0).sum().item()}")
-
-        # --- 3. Inference (CPU, no grad) -----------------------------------
+        # 4. Model Inference & Hard Guardrail
         _model.eval()
         with torch.no_grad():
             u, v = _model(tensor_r, tensor_j)
             u_norm = torch.nn.functional.normalize(u, p=2, dim=1)
             v_norm = torch.nn.functional.normalize(v, p=2, dim=1)
-
             cos_sim = float(torch.sum(u_norm * v_norm, dim=1).item())
-            dist = float(torch.norm(u_norm - v_norm, p=2, dim=1).item())
 
-        # --- 4. Domain Lexical Contrast Guard (Hybrid Re-ranking) ---------
-        # Extract words >= 4 letters from JD excluding basic filler stopwords
-        STOPWORDS = {
-            "with", "from", "that", "this", "will", "have", "been", "must", "team", 
-            "work", "years", "experience", "role", "looking", "candidate", "responsibilities", 
-            "requirements", "skills", "ability", "strong", "preferred", "build", "using"
-        }
-
-        jd_words = set(re.findall(r'\b[a-zA-Z]{3,}\b', clean_jd.lower())) - STOPWORDS
-        resume_words = set(re.findall(r'\b[a-zA-Z]{3,}\b', clean_resume.lower()))
-
-        # Calculate lexical domain overlap ratio
-        domain_overlap = len(jd_words & resume_words) / max(len(jd_words), 1)
-
-        # Calibrate qualification threshold to 0.72 (empirical matched vs mismatched boundary)
-        MATCH_THRESHOLD = 0.72
-        STRONG_MATCH_THRESHOLD = 0.78
-        MIN_DOMAIN_OVERLAP = 0.10
-
-        # Hybrid Re-ranking:
-        # Cross-domain mismatches lacking domain skills (< 0.10) are penalized to prevent false matches.
-        # Qualified domain matches (>= 0.10) have semantic similarity reinforced by skill keyword coverage.
-        if domain_overlap < MIN_DOMAIN_OVERLAP:
-            penalty = max(0.2, domain_overlap / MIN_DOMAIN_OVERLAP)
-            effective_sim = cos_sim * penalty
-            is_qualified = False
+        # GUARD: If two documents have less than 8% meaningful technical vocabulary in common, 
+        # force unqualified regardless of embedding collapse:
+        if overlap_ratio < 0.08:
+            is_match = False
+            score = round(max(14.0, overlap_ratio * 200.0), 1)  # Yields ~15% - 25%
         else:
-            skill_boost = min(0.06, (domain_overlap - MIN_DOMAIN_OVERLAP) * 0.20)
-            effective_sim = cos_sim + skill_boost
-            is_qualified = bool(effective_sim >= MATCH_THRESHOLD)
-
-        # Continuous dual-band hybrid calibration curve:
-        if is_qualified:
-            if effective_sim >= STRONG_MATCH_THRESHOLD:
-                # Strong match: [0.78, 1.0] -> [85%, 98%]
-                norm = min(1.0, (effective_sim - STRONG_MATCH_THRESHOLD) / (1.0 - STRONG_MATCH_THRESHOLD))
-                score = round(85.0 + norm * 13.0, 2)
+            # Standard semantic match logic:
+            is_match = bool(cos_sim >= 0.70)
+            if is_match:
+                score = round(68.0 + ((cos_sim - 0.70) / 0.30) * 28.0, 1)
             else:
-                # Qualified match: [0.72, 0.78] -> [68%, 84%]
-                norm = (effective_sim - MATCH_THRESHOLD) / (STRONG_MATCH_THRESHOLD - MATCH_THRESHOLD)
-                score = round(68.0 + norm * 16.0, 2)
-            score = round(float(min(98.0, max(68.0, score))), 2)
-        else:
-            # Disqualified candidates map to [10%, 54%]
-            norm = max(0.0, effective_sim) / MATCH_THRESHOLD
-            score = round(float(min(54.0, max(10.0, norm * 54.0))), 2)
+                score = round(max(20.0, (cos_sim / 0.70) * 52.0), 1)
 
-        print(
-            f"\n[SERVER MATCH AUDIT] Cos Sim: {cos_sim:.4f} | Euc Dist: {dist:.4f} | "
-            f"Overlap: {domain_overlap:.4f} ({len(jd_words & resume_words)}/{len(jd_words)}) | "
-            f"Eff Sim: {effective_sim:.4f} | Score: {score}% | Qualified: {is_qualified}"
-        )
+        print(f"[SUBMISSION AUDIT] Meaningful Overlap: {len(meaningful_overlap)} words | Cosine: {cos_sim:.4f} | Final Score: {score}% | Match: {is_match}")
 
-        shared_skills = list(jd_words & resume_words)
-        verdict = "MATCH" if is_qualified else "NO MATCH"
-
-        logger.info(
-            "cos_sim=%.4f  euc_dist=%.4f  overlap=%.4f  score=%.2f%%  is_qualified=%s",
-            cos_sim,
-            dist,
-            domain_overlap,
-            score,
-            is_qualified,
-        )
+        verdict = "MATCH" if is_match else "NO MATCH"
+        dist = float(torch.norm(u_norm - v_norm, p=2, dim=1).item())
 
         return {
             "compatibility_score": score,
             "score": score,
-            "is_match": is_qualified,
+            "is_match": is_match,
             "cos_sim": round(cos_sim, 4),
+            "threshold": 0.70,
+            "anonymized_resume": res_result.get("clean_text", clean_r),
+            "anonymized_jd": jd_result.get("clean_text", clean_j),
             "distance": round(dist, 4),
-            "threshold": MATCH_THRESHOLD,
-            "anonymized_resume": clean_resume,
-            "anonymized_jd": clean_jd,
+            "redacted_resume_proxies": res_result.get("redacted_proxies", []),
+            "redacted_jd_proxies": jd_result.get("redacted_proxies", []),
             "match_score": score,
             "raw_distance": round(dist, 4),
             "raw_cosine": round(cos_sim, 4),
             "raw_cosine_similarity": round(cos_sim, 4),
-            "shared_keywords_count": len(shared_skills),
-            "lexical_overlap": round(domain_overlap, 4),
-            "domain_overlap": round(domain_overlap, 4),
-            "effective_similarity": round(effective_sim, 4),
+            "shared_keywords_count": len(meaningful_overlap),
+            "lexical_overlap": round(overlap_ratio, 4),
+            "domain_overlap": round(overlap_ratio, 4),
+            "effective_similarity": round(cos_sim, 4),
             "verdict": verdict,
-            "redacted_resume_proxies": res_result.get("redacted_proxies", []),
-            "redacted_jd_proxies": jd_result.get("redacted_proxies", []),
         }
     except HTTPException:
         raise

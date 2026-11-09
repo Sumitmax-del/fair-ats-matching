@@ -4,7 +4,7 @@
   "description": "FairMatch: Inclusive Resume and Job Matching using PyTorch Siamese Bi-Encoder (UN SDG 10)",
   "scripts": {
     "backend": "uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
-    "frontend": "npx serve frontend -p 5500",
+    "frontend": "npx serve frontend -l 5500",
     "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm run backend\" \"npm run frontend\""
   },
   "devDependencies": {

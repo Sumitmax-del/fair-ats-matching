@@ -1163,8 +1163,10 @@ Key Responsibilities:
 
     function loadPreset(type) {
       if (!DEMO_PRESETS[type]) return;
-      document.getElementById("resumeInput").value = DEMO_PRESETS[type].resume;
-      document.getElementById("jdInput").value = DEMO_PRESETS[type].jd;
+      const rInput = document.getElementById("resumeText") || document.getElementById("resumeInput") || document.querySelector("textarea#resume");
+      const jInput = document.getElementById("jdText") || document.getElementById("jdInput") || document.querySelector("textarea#jd");
+      if (rInput) rInput.value = DEMO_PRESETS[type].resume;
+      if (jInput) jInput.value = DEMO_PRESETS[type].jd;
       updateCounts();
       
       // Animate inputs slightly
@@ -1175,8 +1177,10 @@ Key Responsibilities:
     }
 
     function clearInputs() {
-      document.getElementById("resumeInput").value = "";
-      document.getElementById("jdInput").value = "";
+      const rInput = document.getElementById("resumeText") || document.getElementById("resumeInput") || document.querySelector("textarea#resume");
+      const jInput = document.getElementById("jdText") || document.getElementById("jdInput") || document.querySelector("textarea#jd");
+      if (rInput) rInput.value = "";
+      if (jInput) jInput.value = "";
       updateCounts();
       document.getElementById("resultsSection").classList.remove("visible");
       document.getElementById("errorBox").style.display = "none";
@@ -1195,8 +1199,18 @@ Key Responsibilities:
     ];
 
     async function executeMatch() {
-      const resume = document.getElementById("resumeInput").value.trim();
-      const jd = document.getElementById("jdInput").value.trim();
+      const resumeEl = document.querySelector('textarea#resumeText') || document.querySelector('textarea#resumeInput') || document.querySelector('#resume') || document.querySelectorAll('textarea')[0];
+      const jdEl = document.querySelector('textarea#jdText') || document.querySelector('textarea#jdInput') || document.querySelector('#jd') || document.querySelectorAll('textarea')[1];
+
+      const resumeRaw = resumeEl ? resumeEl.value.trim() : "";
+      const jdRaw = jdEl ? jdEl.value.trim() : "";
+
+      console.log("[DEBUG SUBMISSION] Extracted Resume length:", resumeRaw.length, "JD length:", jdRaw.length);
+      if (resumeRaw.length === 0 || jdRaw.length === 0) {
+          alert("Please paste both Resume and Job Description!");
+          return;
+      }
+
       const btn = document.getElementById("matchBtn");
       const scanStatus = document.getElementById("scanStatus");
       const tickerText = document.getElementById("scanTickerText");
@@ -1205,11 +1219,6 @@ Key Responsibilities:
 
       errorBox.style.display = "none";
       errorBox.textContent = "";
-
-      if (!resume || !jd) {
-        showError("Please provide both a candidate resume and a job description before evaluating.");
-        return;
-      }
 
       // Enter Loading State
       btn.disabled = true;
@@ -1228,7 +1237,7 @@ Key Responsibilities:
         const response = await fetch("http://127.0.0.1:8000/api/match", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ resume_text: resume, job_description: jd }),
+          body: JSON.stringify({ resume_text: resumeRaw, jd_text: jdRaw }),
         });
 
         if (!response.ok) {
@@ -1269,19 +1278,18 @@ Key Responsibilities:
       const resultsSection = document.getElementById("resultsSection");
       resultsSection.classList.add("visible");
 
-      // Unconditionally display data.compatibility_score (no JS math / inversion)
-      const finalScore = Math.round(data.compatibility_score !== undefined ? data.compatibility_score : data.score);
+      const finalScore = data.compatibility_score !== undefined ? data.compatibility_score : data.score;
       const isMatch = Boolean(data.is_match);
 
-      // Force score container text:
-      const scoreEl = document.querySelector('.gauge-value, .score-display, #scoreVal, #gaugeScore, [class*="score"]');
-      if (scoreEl) scoreEl.textContent = `${finalScore}%`;
+      const scoreText = document.querySelector('.gauge-value, .score-display, #scoreVal, #gaugeScore, [class*="score"]');
+      if (scoreText) scoreText.textContent = `${Math.round(finalScore)}%`;
 
-      // Force badge styling:
       const badge = document.querySelector('.verdict-badge, #verdictBadge, [class*="verdict"]');
       if (badge) {
           badge.textContent = isMatch ? "MATCH QUALIFIED" : "BELOW THRESHOLD";
           badge.className = isMatch ? "verdict-badge verdict-match" : "verdict-badge verdict-below";
+          badge.style.backgroundColor = isMatch ? "#16a34a" : "#dc2626";
+          badge.style.color = "#ffffff";
       }
 
       // Force update the circular SVG progress/gauge (if present):
@@ -1299,12 +1307,11 @@ Key Responsibilities:
       const rawDist = data.distance !== undefined ? data.distance : data.raw_distance;
       const distStr = rawDist !== undefined ? Number(rawDist).toFixed(4) : "—";
       const cosSimStr = data.cos_sim !== undefined ? Number(data.cos_sim).toFixed(4) : (data.raw_cosine !== undefined ? Number(data.raw_cosine).toFixed(4) : "—");
-      const thresholdVal = data.threshold !== undefined ? Number(data.threshold).toFixed(2) : "0.72";
+      const thresholdVal = data.threshold !== undefined ? Number(data.threshold).toFixed(2) : "0.70";
 
       const subEl = document.querySelector(".gauge-sub");
       if (subEl) {
-        const overlapStr = data.domain_overlap !== undefined ? ` · Overlap: ${(Number(data.domain_overlap) * 100).toFixed(0)}%` : "";
-        subEl.textContent = `Cos Sim: ${cosSimStr}${overlapStr} · Dist: ${distStr}`;
+        subEl.textContent = `Cos Sim: ${cosSimStr} · Dist: ${distStr}`;
       }
 
       const explanation = document.getElementById("verdictExplanation");
